@@ -1,30 +1,69 @@
-# Namibian Sign Language (NSL) Webcam Translator — Starter Project
+# Namibian Sign Language (NSL) Webcam Translator
 
-There is no large public NSL dataset (unlike ASL), so this project is built
-around a **train-it-yourself** pipeline: you record your own webcam samples
-for the signs you care about, train a lightweight classifier, then run it
-live. Start small (a handful of signs / the alphabet / common greetings)
-and expand once the pipeline works.
+This is my personal project where I am trying to build a webcam based
+translator for Namibian Sign Language (NSL). The idea is simple: you show
+a sign to your webcam, and the program tries to recognize which sign it
+is and shows you the word on screen.
 
-## How it works
+I started this project because there is no big public dataset for NSL
+like there is for American Sign Language (ASL). So instead of downloading
+a ready made dataset, I built a pipeline where I record my own hand
+signs using my webcam, train a small model on them, and then use that
+model to recognize signs live.
 
-1. **MediaPipe's HandLandmarker** extracts 21 3D landmark points per hand
-   from each webcam frame — this is the "skeleton" of the hand shape,
-   robust to lighting and skin tone. (This uses MediaPipe's current Tasks
-   API — the older `mp.solutions.hands` API was removed in recent
-   mediapipe releases.) The first time you run `collect_data.py` or
-   `translate_live.py`, it will automatically download a small model
-   file (`hand_landmarker.task`, ~7 MB) — this needs internet access
-   just that once.
-2. Landmarks are saved to a CSV, labelled with the sign name.
-3. A **RandomForest** classifier learns to map landmark patterns to sign
-   labels (fast to train, works well on small datasets, runs on modest
-   laptops — relevant if you're developing on lower-spec hardware).
-4. The live script re-runs this pipeline per frame and displays the
-   predicted sign, smoothing predictions over several frames before adding
-   a word to the sentence (reduces flicker/false triggers).
+## Project breakdown (SMART analysis)
 
-## Setup (VS Code or Spyder)
+**Specific**
+The goal is to build a system that can look at a person's hand through a
+webcam and correctly guess which Namibian Sign Language sign they are
+showing, starting with a small set of signs like greetings and letters.
+
+**Measurable**
+Success is measured by how many signs the model gets right out of the
+ones I trained it on. When I run `train_model.py`, it prints an accuracy
+report for each sign, so I can see exactly which ones the model is
+struggling with and go collect more samples for those.
+
+**Achievable**
+Instead of trying to train a deep learning model from raw video, which
+would need a lot of data and a strong GPU, I used MediaPipe to just track
+21 points on each hand and fed those points into a RandomForest
+classifier. This keeps things realistic for a student laptop and a small
+amount of self collected data.
+
+**Relevant**
+There isn't a well known NSL recognition tool out there, and most sign
+language projects online are built for ASL. This project tries to close
+that gap a little, even if it starts small, and it also gave me a chance
+to practice computer vision and machine learning basics in a project that
+actually means something to my own context.
+
+**Time bound**
+This is being built in stages. First stage is getting single hand shape
+signs working properly (the current version of the project). Later
+stages, if I keep working on it, would be adding signs that involve
+motion, and maybe collecting help from actual Deaf signers to check that
+the signs I am recording are correct.
+
+## How it actually works
+
+1. When you run the webcam scripts, MediaPipe's hand landmark model looks
+   at each frame and finds 21 points on your hand (fingertips, knuckles,
+   wrist, and so on). The first time you run it, it downloads a small
+   model file for this, so you need internet just for that one time.
+2. Those 21 points get saved into a CSV file along with whatever label
+   you typed in (like HELLO or THANK_YOU). This is the training data.
+3. `train_model.py` reads that CSV and trains a RandomForest model to
+   learn which point patterns match which sign.
+4. `translate_live.py` runs the same point detection live, feeds it into
+   the trained model, and shows you the predicted sign on screen. It also
+   waits for a few frames of the same prediction before adding it to a
+   sentence, so it does not just flicker between random guesses.
+
+## Setup
+
+I used VS Code and Spyder to build this, so here is how to set it up in
+either one.
 
 ```bash
 python -m venv venv
@@ -33,65 +72,67 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-In Spyder: open the project folder via File > Open Project, then run each
-script from the toolbar. In VS Code: open the folder, select the venv
-interpreter (bottom right), run scripts with the green Run arrow or
-`python filename.py` in the integrated terminal.
+In Spyder, open the folder as a project and run each script from the run
+button. In VS Code, open the folder, pick the venv as your interpreter in
+the bottom right corner, and run scripts either with the run arrow or by
+typing `python filename.py` in the terminal.
 
-## Step-by-step usage
+## How to use it, step by step
 
-### 1. Collect data for each sign
-
+### Step 1: Collect samples for a sign
 ```bash
 python collect_data.py
 ```
+It will ask you to type a label for the sign, like HELLO. Hold the sign
+in front of your camera and press `s` a bunch of times to save samples,
+moving your hand slightly each time so the model sees some variation.
+I aimed for around 150 to 300 samples per sign. Press `q` when done.
 
-Enter a label (e.g. `HELLO`), then press `s` repeatedly while holding the
-sign at slightly different angles/positions to build up ~150–300 samples.
-Repeat this script for every sign you want recognised (different label
-each time — all samples accumulate in `data/landmarks.csv`).
+### Step 2: Repeat for every sign you want
+Run `collect_data.py` again for each new sign with a different label.
+Everything gets added to the same `data/landmarks.csv` file, so you do
+not lose earlier signs when you add new ones.
 
-### 2. Train the model
-
+### Step 3: Train the model
 ```bash
 python train_model.py
 ```
+This trains the model on everything in your CSV and prints out how well
+it did per sign. If one sign has low accuracy, go back and record more
+samples for just that one.
 
-Prints accuracy/precision per sign and saves the model to `model/`.
-If accuracy is low for a sign, go back and collect more/cleaner samples
-for it (vary hand angle, distance from camera, lighting).
-
-### 3. Run live translation
-
+### Step 4: Run it live
 ```bash
 python translate_live.py
 ```
+Show your webcam a sign you trained and it should show the predicted
+sign and confidence on screen, and build a sentence as you go. Press `c`
+to clear the sentence and `q` to quit.
 
-Shows the predicted sign and confidence, and builds a sentence as you
-sign in sequence. Press `c` to clear, `q` to quit.
+## Things I kept in mind for the Namibian context
 
-## Namibian-context notes
+- Namibia does not have one single, well documented, standard sign
+  language dataset, so I am not assuming my recorded signs are perfect.
+  If I want this to actually be useful, I would need to check my signs
+  with real Deaf Namibian signers, maybe through an organization like the
+  Namibia National Association of the Deaf (NNAD), instead of guessing
+  based on ASL or SASL videos.
+- Everything runs fully offline once it is set up. No cloud calls needed
+  after the first run. This matters because data can be expensive and
+  internet is not always reliable everywhere in Namibia.
+- The whole thing is built to run on a normal laptop without a GPU, since
+  that is what most students realistically have access to.
 
-- **No assumptions about which sign language variant**: Namibia doesn't
-  have one single standardised, widely-documented sign language dataset.
-  If possible, work with Deaf Namibian signers or an organisation like the
-  Namibia National Association of the Deaf (NNAD) to confirm the signs
-  you're recording are actually correct NSL, not borrowed ASL/SASL signs —
-  this matters a lot for real usefulness, not just accuracy.
-- **Low-bandwidth / offline-first**: everything above runs fully locally,
-  no cloud API calls or internet needed after installation — useful given
-  data costs and connectivity outside major towns.
-- **Modest hardware**: RandomForest + MediaPipe landmarks (rather than
-  training a deep CNN on raw video) keeps this runnable on a typical
-  student laptop without a GPU.
-- **Extend later**: once single-sign recognition works, consider adding
-  temporal models (e.g. an LSTM over landmark sequences) for signs that
-  involve motion, not just a static hand shape.
+## What this project does not do yet
 
-## Known limitations
-
-- Single-hand-shape signs only for now — no motion/sequence modelling.
-- Accuracy depends heavily on how much and how varied your training data
-  is per sign.
-- Backgrounds/lighting differences between collection and live use can
-  hurt accuracy — collect data in conditions similar to where you'll demo it.
+- It only recognizes signs that are a single still hand shape. It cannot
+  yet handle signs that involve movement, since that would need a
+  different kind of model that looks at sequences of frames instead of
+  just one frame at a time.
+- Accuracy really depends on how much data I collect and how varied it
+  is. A sign trained with only 20 samples from one angle will not work as
+  well as one trained with 200 samples from different angles and
+  distances.
+- Lighting and background can affect accuracy if they are very different
+  between when I collected the data and when I actually demo it, so I try
+  to test in similar conditions to where I plan to use it.
